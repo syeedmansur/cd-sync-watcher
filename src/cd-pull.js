@@ -232,6 +232,151 @@ function copyAssets(cdDir, category, srcSubdir, destSubdir) {
   return copied;
 }
 
+/**
+ * Parse CSS text into an ordered list of { selector, body, raw } blocks.
+ * Handles flat rules only (no @media nesting). Skips :root {} blocks.
+ */
+function parseCSSRules(css) {
+  const rules = [];
+  let i = 0;
+  while (i < css.length) {
+    // Skip whitespace and comments
+    if (css[i] === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end === -1 ? css.length : end + 2;
+      continue;
+    }
+    if (/\s/.test(css[i])) { i++; continue; }
+
+    // Find opening brace
+    const braceStart = css.indexOf('{', i);
+    if (braceStart === -1) break;
+    const selector = css.slice(i, braceStart).trim();
+
+    // Match braces (handles nested braces in :root)
+    let depth = 1;
+    let j = braceStart + 1;
+    while (j < css.length && depth > 0) {
+      if (css[j] === '{') depth++;
+      else if (css[j] === '}') depth--;
+      j++;
+    }
+    const body = css.slice(braceStart + 1, j - 1).trim();
+    const raw = css.slice(i, j);
+
+    if (selector !== ':root' && !selector.startsWith('@')) {
+      rules.push({ selector, body, raw });
+    }
+    i = j;
+  }
+  return rules;
+}
+
+/**
+ * Parse CSS body into a Map of property-name → full declaration (e.g. "flex" → "flex: 1 1 0%").
+ */
+function parseProps(body) {
+  const map = new Map();
+  for (const decl of body.split(';')) {
+    const trimmed = decl.trim();
+    if (!trimmed) continue;
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx === -1) continue;
+    const prop = trimmed.slice(0, colonIdx).trim();
+    map.set(prop, trimmed);
+  }
+  return map;
+}
+
+/**
+ * Property-level merge: take CD's properties, keep CC-only additions.
+ * CD wins when both define the same property; CC-only properties are preserved.
+ */
+function mergeProps(ccBody, cdBody) {
+  const ccProps = parseProps(ccBody);
+  const cdProps = parseProps(cdBody);
+  const merged = new Map(ccProps);
+  for (const [prop, decl] of cdProps) {
+    merged.set(prop, decl);
+  }
+  return [...merged.values()].join(';\n  ');
+}
+
+/**
+ * Merge CD's <style> CSS into tokens.css.
+ * - NEW rules from CD are appended in a marked section.
+ * - CHANGED rules get property-level merge (CD wins per-property, CC-only properties kept).
+ * - CC-only rules are preserved untouched.
+ * - Component-scoped rules (.live-*, .sparkline*) are skipped.
+ */
+function mergeCSS(cdStyleText) {
+  const tokensPath = path.join(REPO_ROOT, "frontend/src/design-system/tokens.css");
+  let tokensCSS = fs.existsSync(tokensPath) ? fs.readFileSync(tokensPath, "utf8") : "";
+
+  const cdRules = parseCSSRules(cdStyleText);
+  const ccRules = parseCSSRules(tokensCSS);
+  const ccBySelector = {};
+  for (const rule of ccRules) {
+    ccBySelector[rule.selector] = rule;
+  }
+
+  const skipPrefixes = [".live-", ".sparkline"];
+  const added = [];
+  const updated = [];
+  const skipped = [];
+  const toAppend = [];
+
+  for (const cdRule of cdRules) {
+    if (skipPrefixes.some(p => cdRule.selector.startsWith(p))) {
+      skipped.push(cdRule.selector);
+      continue;
+    }
+
+    const existing = ccBySelector[cdRule.selector];
+    if (!existing) {
+      const formatted = formatRule(cdRule.selector, cdRule.body);
+      toAppend.push(formatted);
+      added.push(cdRule.selector);
+    } else {
+      const mergedBody = mergeProps(existing.body, cdRule.body);
+      const ccNorm = [...parseProps(existing.body).values()].sort().join('; ');
+      const mergedNorm = [...parseProps(mergedBody).values()].sort().join('; ');
+      if (ccNorm !== mergedNorm) {
+        const formatted = formatRule(cdRule.selector, mergedBody);
+        tokensCSS = tokensCSS.replace(existing.raw, formatted);
+        updated.push(cdRule.selector);
+      }
+    }
+  }
+
+  if (toAppend.length > 0) {
+    const marker = "/* --- CD auto-merged rules --- */";
+    const existingMarkerIdx = tokensCSS.indexOf(marker);
+    const block = toAppend.join("\n");
+
+    if (existingMarkerIdx !== -1) {
+      const insertPoint = tokensCSS.indexOf("\n", existingMarkerIdx) + 1;
+      tokensCSS = tokensCSS.slice(0, insertPoint) + block + "\n" + tokensCSS.slice(insertPoint);
+    } else {
+      tokensCSS = tokensCSS.trimEnd() + "\n\n" + marker + "\n" + block + "\n";
+    }
+  }
+
+  fs.writeFileSync(tokensPath, tokensCSS);
+  return { added, updated, skipped };
+}
+
+/**
+ * Format a CSS rule block with consistent indentation.
+ */
+function formatRule(selector, body) {
+  const props = body.split(';').map(p => p.trim()).filter(Boolean);
+  if (props.length <= 2) {
+    return `${selector} { ${props.join('; ')}; }`;
+  }
+  return `${selector} {\n${props.map(p => `  ${p};`).join('\n')}\n}`;
+}
+
 function main() {
   const input = process.argv[2];
   if (!input) {
@@ -343,41 +488,19 @@ function main() {
       layoutDiffs.forEach(d => console.log(d + "\n"));
     }
 
-    // CSS drift detection: compare CD's <style> block to tokens.css
+    // CSS auto-merge: extract CD's <style> rules and merge into tokens.css
     const styleMatch = cdHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
     if (styleMatch) {
-      const cdCSS = styleMatch[1];
-      const ruleRe = /([.#][a-zA-Z][\w-]*(?:\s+[a-zA-Z][\w-]*)*)\s*\{([^}]+)\}/g;
-      const cdRules = {};
-      let m;
-      while ((m = ruleRe.exec(cdCSS)) !== null) {
-        cdRules[m[1].trim()] = m[2].trim().replace(/\s+/g, " ");
-      }
-
-      const tokensPath = path.join(REPO_ROOT, "frontend/src/design-system/tokens.css");
-      const tokensCSS = fs.existsSync(tokensPath) ? fs.readFileSync(tokensPath, "utf8") : "";
-      const ccRules = {};
-      while ((m = ruleRe.exec(tokensCSS)) !== null) {
-        ccRules[m[1].trim()] = m[2].trim().replace(/\s+/g, " ");
-      }
-
-      const cssDiffs = [];
-      for (const [selector, props] of Object.entries(cdRules)) {
-        if (selector.startsWith(".live-") || selector.startsWith(".sparkline")) continue;
-        if (!ccRules[selector]) {
-          cssDiffs.push(`  NEW RULE: ${selector} { ${props.substring(0, 80)}${props.length > 80 ? "..." : ""} }`);
-        } else if (ccRules[selector] !== props) {
-          cssDiffs.push(`  CHANGED: ${selector}\n    CD: { ${props.substring(0, 80)}${props.length > 80 ? "..." : ""} }\n    CC: { ${ccRules[selector].substring(0, 80)}${ccRules[selector].length > 80 ? "..." : ""} }`);
-        }
-      }
-
-      if (cssDiffs.length > 0) {
+      const merged = mergeCSS(styleMatch[1]);
+      if (merged.added.length > 0 || merged.updated.length > 0) {
         console.log("========================================");
-        console.log("  CSS DRIFT: tokens.css vs CD index.html <style>");
+        console.log("  CSS AUTO-MERGE: CD <style> → tokens.css");
         console.log("========================================\n");
-        console.log("CD's <style> block has CSS rules not in tokens.css.");
-        console.log("Review and add missing rules to frontend/src/design-system/tokens.css.\n");
-        cssDiffs.forEach(d => console.log(d + "\n"));
+        merged.added.forEach(s => console.log(`  ADDED: ${s}`));
+        merged.updated.forEach(s => console.log(`  UPDATED: ${s}`));
+        merged.skipped.forEach(s => console.log(`  SKIPPED (component-scoped): ${s}`));
+        console.log("");
+        changes.push(`Updated: frontend/src/design-system/tokens.css  (${merged.added.length} new, ${merged.updated.length} changed rules from CD <style>)`);
       }
     }
   }

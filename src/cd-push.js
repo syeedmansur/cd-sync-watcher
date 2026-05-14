@@ -260,7 +260,7 @@ function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, "CHANGESET.md"), changeset);
 
   // Always include the frontend design principles doc for CD to read
-  const principlesNames = ["FRONTEND_PRINCIPLES.md", "CLAUDE.md"];
+  const principlesNames = ["FRONTEND_PRINCIPLES.md"];
   const docsDir = path.join(REPO_ROOT, "docs", "cd-handoff");
   for (const name of principlesNames) {
     const src = path.join(docsDir, name);
