@@ -342,6 +342,44 @@ function main() {
       console.log("Update main.jsx to match (titles and eyebrows are string-only changes).\n");
       layoutDiffs.forEach(d => console.log(d + "\n"));
     }
+
+    // CSS drift detection: compare CD's <style> block to tokens.css
+    const styleMatch = cdHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+    if (styleMatch) {
+      const cdCSS = styleMatch[1];
+      const ruleRe = /([.#][a-zA-Z][\w-]*(?:\s+[a-zA-Z][\w-]*)*)\s*\{([^}]+)\}/g;
+      const cdRules = {};
+      let m;
+      while ((m = ruleRe.exec(cdCSS)) !== null) {
+        cdRules[m[1].trim()] = m[2].trim().replace(/\s+/g, " ");
+      }
+
+      const tokensPath = path.join(REPO_ROOT, "frontend/src/design-system/tokens.css");
+      const tokensCSS = fs.existsSync(tokensPath) ? fs.readFileSync(tokensPath, "utf8") : "";
+      const ccRules = {};
+      while ((m = ruleRe.exec(tokensCSS)) !== null) {
+        ccRules[m[1].trim()] = m[2].trim().replace(/\s+/g, " ");
+      }
+
+      const cssDiffs = [];
+      for (const [selector, props] of Object.entries(cdRules)) {
+        if (selector.startsWith(".live-") || selector.startsWith(".sparkline")) continue;
+        if (!ccRules[selector]) {
+          cssDiffs.push(`  NEW RULE: ${selector} { ${props.substring(0, 80)}${props.length > 80 ? "..." : ""} }`);
+        } else if (ccRules[selector] !== props) {
+          cssDiffs.push(`  CHANGED: ${selector}\n    CD: { ${props.substring(0, 80)}${props.length > 80 ? "..." : ""} }\n    CC: { ${ccRules[selector].substring(0, 80)}${ccRules[selector].length > 80 ? "..." : ""} }`);
+        }
+      }
+
+      if (cssDiffs.length > 0) {
+        console.log("========================================");
+        console.log("  CSS DRIFT: tokens.css vs CD index.html <style>");
+        console.log("========================================\n");
+        console.log("CD's <style> block has CSS rules not in tokens.css.");
+        console.log("Review and add missing rules to frontend/src/design-system/tokens.css.\n");
+        cssDiffs.forEach(d => console.log(d + "\n"));
+      }
+    }
   }
 
   // Copy binary assets (images, fonts, uploads)
