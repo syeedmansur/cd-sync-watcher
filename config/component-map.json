@@ -1,0 +1,416 @@
+{
+  "_comment": "Dependency map for CD ↔ CC sync. Maps each component to its repo location, exports, and imports from other components.",
+
+  "Atoms.jsx": {
+    "cdPath": "components/Atoms.jsx",
+    "repoPath": "frontend/src/design-system/Atoms.jsx",
+    "exports": ["Icon", "ICONS", "StatusBadge"],
+    "dependsOn": {}
+  },
+  "D3Charts.jsx": {
+    "cdPath": "components/D3Charts.jsx",
+    "repoPath": "frontend/src/analytics/D3Charts.jsx",
+    "exports": ["TimeRangeSelector", "D3AreaChart", "D3BarChart", "D3DonutChart", "D3RadialGauge", "Sparkline", "generateTimeSeries", "getCachedSeries"],
+    "dependsOn": {}
+  },
+  "Charts.jsx": {
+    "cdPath": "components/Charts.jsx",
+    "repoPath": "frontend/src/analytics/Charts.jsx",
+    "exports": ["Sparkline", "BarChart", "DonutChart", "RadialGauge", "FunnelViz"],
+    "dependsOn": {},
+    "_note": "Legacy — unused, D3Charts.jsx provides the active Sparkline"
+  },
+  "LocalPulseData.jsx": {
+    "cdPath": "components/LocalPulseData.jsx",
+    "repoPath": "frontend/src/local-pulse/LocalPulseData.jsx",
+    "exports": ["PERMIT_CATEGORIES", "BENCHMARK_OPTIONS", "SAVED_AREAS", "generatePermits", "generateDailyVolume", "VELOCITY_SCORE", "PEER_DATA"],
+    "dependsOn": {}
+  },
+  "CRMData.jsx": {
+    "cdPath": "components/CRMData.jsx",
+    "repoPath": "frontend/src/crm/CRMData.jsx",
+    "exports": ["CRM_PIPELINE_STATS", "CRM_LEADS", "PR_CATEGORIES"],
+    "dependsOn": {}
+  },
+  "PropertyRadarService.jsx": {
+    "cdPath": "components/PropertyRadarService.jsx",
+    "repoPath": "frontend/src/services/PropertyRadarService.js",
+    "exports": ["prFetch", "prSearchByAddress", "prGetProperty", "mapPRResponseToDisplay", "buildPropertiesBody", "buildPropertiesUrl", "PR_PROXY_URL", "PR_FIELD_CONFIG", "PR_TAB_GROUPS", "PR_FIELDS"],
+    "dependsOn": {}
+  },
+  "SupabaseClient.jsx": {
+    "cdPath": "components/SupabaseClient.jsx",
+    "repoPath": "frontend/src/services/SupabaseClient.js",
+    "exports": ["supabase", "fetchHistory", "insertHistory", "deleteHistoryByIds", "signIn", "signOut", "getSession", "onAuthStateChange", "loadUserProfile", "loadPendingCount"],
+    "dependsOn": {},
+    "protected": true,
+    "protectedReason": "CC uses @supabase/supabase-js SDK with Auth helpers; CD has lightweight REST mock"
+  },
+  "LoanCalc.jsx": {
+    "cdPath": "components/LoanCalc.jsx",
+    "repoPath": "frontend/src/lib/LoanCalc.js",
+    "exports": ["calcRate", "calcEscrowLoan", "computeOffer", "computeFiveYearTotal", "computeLoanOffers", "STANDARD_PRESET", "SIXTY_PRESET"],
+    "dependsOn": {}
+  },
+  "AutoScrollList.jsx": {
+    "cdPath": "components/AutoScrollList.jsx",
+    "repoPath": "frontend/src/shared/AutoScrollList.jsx",
+    "exports": ["AutoScrollList"],
+    "dependsOn": {}
+  },
+  "DraggableChips.jsx": {
+    "cdPath": "components/DraggableChips.jsx",
+    "repoPath": "frontend/src/shared/DraggableChips.jsx",
+    "exports": ["DraggableChips"],
+    "dependsOn": {}
+  },
+  "TableActions.jsx": {
+    "cdPath": "components/TableActions.jsx",
+    "repoPath": "frontend/src/crm/TableActions.jsx",
+    "exports": ["TableActionBar", "EmailPreviewPopup", "PostcardPreviewPopup"],
+    "dependsOn": {}
+  },
+  "VelocityGauge.jsx": {
+    "cdPath": "components/VelocityGauge.jsx",
+    "repoPath": "frontend/src/local-pulse/VelocityGauge.jsx",
+    "exports": ["VelocityGauge"],
+    "dependsOn": {}
+  },
+  "tweaks-panel.jsx": {
+    "cdPath": "tweaks-panel.jsx",
+    "repoPath": "frontend/src/chrome/TweaksPanel.jsx",
+    "exports": ["useTweaks", "TweaksPanel", "TweakSection", "TweakRow", "TweakSlider", "TweakToggle", "TweakRadio", "TweakSelect", "TweakText", "TweakNumber", "TweakColor", "TweakButton"],
+    "dependsOn": {}
+  },
+  "CollapsibleSection.jsx": {
+    "cdPath": "components/CollapsibleSection.jsx",
+    "repoPath": "frontend/src/chrome/CollapsibleSection.jsx",
+    "exports": ["CollapsibleSection", "ReferralBanner", "TierLayersIcon"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "ShareModal.jsx": ["ShareModal"]
+    }
+  },
+  "ShareModal.jsx": {
+    "cdPath": "components/ShareModal.jsx",
+    "repoPath": "frontend/src/shared/ShareModal.jsx",
+    "exports": ["ShareModal", "PulseCardPreview"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "TopNav.jsx": {
+    "cdPath": "components/TopNav.jsx",
+    "repoPath": "frontend/src/chrome/TopNav.jsx",
+    "exports": ["TopNav"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "SnapshotStrip.jsx": {
+    "cdPath": "components/SnapshotStrip.jsx",
+    "repoPath": "frontend/src/chrome/SnapshotStrip.jsx",
+    "exports": ["SnapshotStrip", "SnapshotGreeting"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "D3Charts.jsx": ["Sparkline"]
+    }
+  },
+  "FindNewLeads.jsx": {
+    "cdPath": "components/FindNewLeads.jsx",
+    "repoPath": "frontend/src/prescreen/FindNewLeads.jsx",
+    "exports": ["FindNewLeads"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "InviteToUnlock.jsx": {
+    "cdPath": "components/InviteToUnlock.jsx",
+    "repoPath": "frontend/src/shared/InviteToUnlock.jsx",
+    "exports": ["InviteToUnlock"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "Crews.jsx": {
+    "cdPath": "components/Crews.jsx",
+    "repoPath": "frontend/src/local-pulse/Crews.jsx",
+    "exports": ["CrewsDropdown", "CrewModal", "MOCK_CREWS"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "PeerActivity.jsx": {
+    "cdPath": "components/PeerActivity.jsx",
+    "repoPath": "frontend/src/local-pulse/PeerActivity.jsx",
+    "exports": ["PeerActivityPanel", "PercentileBar"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "PreviewOffer.jsx": {
+    "cdPath": "components/PreviewOffer.jsx",
+    "repoPath": "frontend/src/prescreen/PreviewOffer.jsx",
+    "exports": ["PreviewOfferPopup"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "LeadDetailPanel.jsx": {
+    "cdPath": "components/LeadDetailPanel.jsx",
+    "repoPath": "frontend/src/crm/LeadDetailPanel.jsx",
+    "exports": ["LeadDetailPanel"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "TakeAction.jsx": {
+    "cdPath": "components/TakeAction.jsx",
+    "repoPath": "frontend/src/prescreen/TakeAction.jsx",
+    "exports": ["TakeAction"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS", "StatusBadge"]
+    }
+  },
+  "Sidebar.jsx": {
+    "cdPath": "components/Sidebar.jsx",
+    "repoPath": "frontend/src/shared/Sidebar.jsx",
+    "exports": ["PMProSidebar"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    },
+    "_note": "Currently unused — TopNav replaced it"
+  },
+  "LiveMap.jsx": {
+    "cdPath": "components/LiveMap.jsx",
+    "repoPath": "frontend/src/local-pulse/LiveMap.jsx",
+    "exports": ["LiveMap"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "LocalPulseData.jsx": ["PERMIT_CATEGORIES"]
+    }
+  },
+  "Leaderboard.jsx": {
+    "cdPath": "components/Leaderboard.jsx",
+    "repoPath": "frontend/src/local-pulse/Leaderboard.jsx",
+    "exports": ["Leaderboard", "LeaderboardRow"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "LocalPulseData.jsx": ["PERMIT_CATEGORIES"]
+    }
+  },
+  "MarketPulse.jsx": {
+    "cdPath": "components/MarketPulse.jsx",
+    "repoPath": "frontend/src/local-pulse/MarketPulse.jsx",
+    "exports": ["MarketPulsePanel", "Odometer", "StackedBar"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "D3Charts.jsx": ["Sparkline"],
+      "LocalPulseData.jsx": ["generateDailyVolume"]
+    }
+  },
+  "AnalyticsRow.jsx": {
+    "cdPath": "components/AnalyticsRow.jsx",
+    "repoPath": "frontend/src/analytics/AnalyticsRow.jsx",
+    "exports": ["AnalyticsRow"],
+    "dependsOn": {
+      "D3Charts.jsx": ["TimeRangeSelector", "D3BarChart", "D3AreaChart", "D3RadialGauge", "getCachedSeries"]
+    }
+  },
+  "CRMDashboard.jsx": {
+    "cdPath": "components/CRMDashboard.jsx",
+    "repoPath": "frontend/src/crm/CRMDashboard.jsx",
+    "exports": ["CRMDashboard"],
+    "dependsOn": {
+      "CRMData.jsx": ["CRM_LEADS", "CRM_PIPELINE_STATS"],
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "D3Charts.jsx": ["Sparkline"]
+    }
+  },
+  "PipelinePulse.jsx": {
+    "cdPath": "components/PipelinePulse.jsx",
+    "repoPath": "frontend/src/crm/PipelinePulse.jsx",
+    "exports": ["PipelinePulse", "FunnelView", "WaterfallView"],
+    "dependsOn": {
+      "D3Charts.jsx": ["TimeRangeSelector"],
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "InlineEmailPreview.jsx": {
+    "cdPath": "components/InlineEmailPreview.jsx",
+    "repoPath": "frontend/src/shared/InlineEmailPreview.jsx",
+    "exports": ["InlineEmailPreview"],
+    "dependsOn": {
+      "LoanCalc.jsx": ["computeLoanOffers"]
+    }
+  },
+  "LocalPulse.jsx": {
+    "cdPath": "components/LocalPulse.jsx",
+    "repoPath": "frontend/src/local-pulse/LocalPulse.jsx",
+    "exports": ["LocalPulse"],
+    "dependsOn": {
+      "LocalPulseData.jsx": ["SAVED_AREAS", "generatePermits", "PEER_DATA", "VELOCITY_SCORE", "PERMIT_CATEGORIES"],
+      "Crews.jsx": ["CrewsDropdown", "CrewModal", "MOCK_CREWS"],
+      "D3Charts.jsx": ["TimeRangeSelector"],
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "LiveMap.jsx": ["LiveMap"],
+      "MarketPulse.jsx": ["MarketPulsePanel"],
+      "VelocityGauge.jsx": ["VelocityGauge"],
+      "PeerActivity.jsx": ["PeerActivityPanel"],
+      "ShareModal.jsx": ["ShareModal"],
+      "Leaderboard.jsx": ["Leaderboard"]
+    }
+  },
+  "OneShotPrescreen.jsx": {
+    "cdPath": "components/OneShotPrescreen.jsx",
+    "repoPath": "frontend/src/prescreen/OneShotPrescreen.jsx",
+    "exports": ["OneShotPrescreen", "PropertyMapMemo", "StreetViewMemo"],
+    "dependsOn": {
+      "PropertyRadarService.jsx": ["prSearchByAddress", "mapPRResponseToDisplay"],
+      "CRMData.jsx": ["PR_CATEGORIES"],
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "DraggableChips.jsx": ["DraggableChips"],
+      "TableActions.jsx": ["TableActionBar", "EmailPreviewPopup", "PostcardPreviewPopup"],
+      "InlineEmailPreview.jsx": ["InlineEmailPreview"],
+      "LoanCalc.jsx": ["computeLoanOffers"]
+    }
+  },
+  "GeoPrescreen.jsx": {
+    "cdPath": "components/GeoPrescreen.jsx",
+    "repoPath": "frontend/src/prescreen/GeoPrescreen.jsx",
+    "exports": ["GeoPrescreen", "GEO_FILTER_GROUPS"],
+    "dependsOn": {
+      "PropertyRadarService.jsx": ["prFetch", "buildPropertiesBody", "buildPropertiesUrl", "PR_FIELD_CONFIG", "mapPRResponseToDisplay"],
+      "CRMData.jsx": ["PR_CATEGORIES"],
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "DraggableChips.jsx": ["DraggableChips"],
+      "TableActions.jsx": ["TableActionBar", "EmailPreviewPopup", "PostcardPreviewPopup"],
+      "SupabaseClient.jsx": ["fetchHistory", "insertHistory", "deleteHistoryByIds"],
+      "AutoScrollList.jsx": ["AutoScrollList"]
+    }
+  },
+
+  "AdminData.jsx": {
+    "cdPath": "components/AdminData.jsx",
+    "repoPath": "frontend/src/admin/AdminData.jsx",
+    "exports": ["MOCK_USERS", "PENDING_USERS", "MOCK_COMPANIES", "TIER_CONFIG", "CREDIT_HISTORY", "GREENLYNE_USERS"],
+    "dependsOn": {}
+  },
+  "AvatarCropModal.jsx": {
+    "cdPath": "components/AvatarCropModal.jsx",
+    "repoPath": "frontend/src/chrome/AvatarCropModal.jsx",
+    "exports": ["AvatarCropModal"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "BrandingTab.jsx": {
+    "cdPath": "components/BrandingTab.jsx",
+    "repoPath": "frontend/src/admin/BrandingTab.jsx",
+    "exports": ["BrandingTab"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "CreditManagement.jsx": {
+    "cdPath": "components/CreditManagement.jsx",
+    "repoPath": "frontend/src/admin/CreditManagement.jsx",
+    "exports": ["CreditManagementTab", "PurchaseCreditsModal", "TierUpgradeModal"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["TIER_CONFIG", "MOCK_USERS", "CREDIT_HISTORY"]
+    }
+  },
+  "EmailTemplates.jsx": {
+    "cdPath": "components/EmailTemplates.jsx",
+    "repoPath": "frontend/src/admin/EmailTemplates.jsx",
+    "exports": ["EmailTemplatesPreview"],
+    "dependsOn": {}
+  },
+  "LoginPage.jsx": {
+    "cdPath": "components/LoginPage.jsx",
+    "repoPath": "frontend/src/auth/LoginPage.jsx",
+    "exports": ["LoginPage"],
+    "dependsOn": {
+      "AdminData.jsx": ["MOCK_COMPANIES", "MOCK_USERS", "GREENLYNE_USERS"]
+    },
+    "protected": true,
+    "protectedReason": "CC wired to Supabase Auth (signIn import, async handleSubmit); CD has mock setTimeout login"
+  },
+  "MasterAdminBar.jsx": {
+    "cdPath": "components/MasterAdminBar.jsx",
+    "repoPath": "frontend/src/admin/MasterAdminBar.jsx",
+    "exports": ["MasterAdminBar"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["MOCK_COMPANIES", "TIER_CONFIG"]
+    }
+  },
+  "NotificationsDropdown.jsx": {
+    "cdPath": "components/NotificationsDropdown.jsx",
+    "repoPath": "frontend/src/chrome/NotificationsDropdown.jsx",
+    "exports": ["NotificationsDropdown", "MOCK_NOTIFICATIONS"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "PasswordResetFlow.jsx": {
+    "cdPath": "components/PasswordResetFlow.jsx",
+    "repoPath": "frontend/src/auth/PasswordResetFlow.jsx",
+    "exports": ["PasswordResetFlow"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  },
+  "PermissionsTab.jsx": {
+    "cdPath": "components/PermissionsTab.jsx",
+    "repoPath": "frontend/src/admin/PermissionsTab.jsx",
+    "exports": ["PermissionsTab", "AddOverrideModal"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["MOCK_USERS"]
+    }
+  },
+  "RegistrationFlow.jsx": {
+    "cdPath": "components/RegistrationFlow.jsx",
+    "repoPath": "frontend/src/auth/RegistrationFlow.jsx",
+    "exports": ["RegistrationFlow"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["MOCK_COMPANIES"],
+      "AvatarCropModal.jsx": ["AvatarCropModal"]
+    }
+  },
+  "UserAdminDashboard.jsx": {
+    "cdPath": "components/UserAdminDashboard.jsx",
+    "repoPath": "frontend/src/admin/UserAdminDashboard.jsx",
+    "exports": ["UserAdminDashboard"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["MOCK_COMPANIES", "TIER_CONFIG"],
+      "MasterAdminBar.jsx": ["MasterAdminBar"],
+      "UserManagement.jsx": ["UserManagementTab"],
+      "CreditManagement.jsx": ["CreditManagementTab"],
+      "PermissionsTab.jsx": ["PermissionsTab"],
+      "BrandingTab.jsx": ["BrandingTab"],
+      "EmailTemplates.jsx": ["EmailTemplatesPreview"]
+    }
+  },
+  "UserManagement.jsx": {
+    "cdPath": "components/UserManagement.jsx",
+    "repoPath": "frontend/src/admin/UserManagement.jsx",
+    "exports": ["UserManagementTab", "InviteUserModal", "EditUserModal"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"],
+      "AdminData.jsx": ["GREENLYNE_USERS", "MOCK_USERS", "PENDING_USERS"]
+    }
+  },
+  "UserProfilePage.jsx": {
+    "cdPath": "components/UserProfilePage.jsx",
+    "repoPath": "frontend/src/admin/UserProfilePage.jsx",
+    "exports": ["UserProfilePage"],
+    "dependsOn": {
+      "Atoms.jsx": ["Icon", "ICONS"]
+    }
+  }
+}

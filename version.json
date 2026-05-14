@@ -1,0 +1,12 @@
+{
+  "version": "2.1.0",
+  "build": "2026-05-14",
+  "name": "CD Sync Watcher",
+  "bundleId": "com.pmpro.cd-sync-menu",
+  "launchAgentLabel": "com.pmpro.cd-sync-watcher",
+  "versioningRules": {
+    "patch": "Script-only changes (bug fixes, new detection patterns, output formatting)",
+    "minor": "Memory/protocol updates, new workflow steps, SYNC-GUIDE changes",
+    "major": "Both scripts AND memory/protocol changed in same release"
+  }
+}

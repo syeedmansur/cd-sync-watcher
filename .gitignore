@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+menu-app/build/
+*.cd-incoming
+.cd-sync-status.json
+.cd-sync.log
+.env
