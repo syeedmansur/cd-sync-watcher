@@ -259,15 +259,14 @@ function main() {
 
   fs.writeFileSync(path.join(OUTPUT_DIR, "CHANGESET.md"), changeset);
 
-  // Always include the frontend design principles doc for CD to read
-  const principlesNames = ["FRONTEND_PRINCIPLES.md"];
+  // Always include principles docs for CD to read
+  const principlesNames = ["FRONTEND_PRINCIPLES.md", "DEV_PRINCIPLES.md"];
   const docsDir = path.join(REPO_ROOT, "docs", "cd-handoff");
   for (const name of principlesNames) {
     const src = path.join(docsDir, name);
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, path.join(OUTPUT_DIR, name));
       console.log(`  Included ${name} for CD`);
-      break;
     }
   }
 

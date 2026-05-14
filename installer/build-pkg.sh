@@ -40,11 +40,13 @@ cp "$REPO_DIR/config/component-map.json" "$BUILD_DIR/payload/tmp/cdsync-tools/"
 cp "$REPO_DIR/docs/SYNC-GUIDE.md" "$BUILD_DIR/payload/tmp/cdsync-tools/"
 cp "$REPO_DIR/version.json" "$BUILD_DIR/payload/tmp/cdsync-tools/"
 
-# Include frontend principles doc for CD
+# Include principles docs (for CD and CC to read)
 mkdir -p "$BUILD_DIR/payload/tmp/cdsync-cd-handoff"
-if [ -f "$REPO_DIR/docs/FRONTEND_PRINCIPLES.md" ]; then
-    cp "$REPO_DIR/docs/FRONTEND_PRINCIPLES.md" "$BUILD_DIR/payload/tmp/cdsync-cd-handoff/"
-fi
+for f in FRONTEND_PRINCIPLES.md DEV_PRINCIPLES.md; do
+    if [ -f "$REPO_DIR/docs/$f" ]; then
+        cp "$REPO_DIR/docs/$f" "$BUILD_DIR/payload/tmp/cdsync-cd-handoff/"
+    fi
+done
 chmod +x "$BUILD_DIR/payload/tmp/cdsync-tools/cd-sync.js" \
          "$BUILD_DIR/payload/tmp/cdsync-tools/cd-pull.js" \
          "$BUILD_DIR/payload/tmp/cdsync-tools/cd-push.js"
