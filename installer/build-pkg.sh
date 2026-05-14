@@ -39,6 +39,14 @@ done
 cp "$REPO_DIR/config/component-map.json" "$BUILD_DIR/payload/tmp/cdsync-tools/"
 cp "$REPO_DIR/docs/SYNC-GUIDE.md" "$BUILD_DIR/payload/tmp/cdsync-tools/"
 cp "$REPO_DIR/version.json" "$BUILD_DIR/payload/tmp/cdsync-tools/"
+
+# Include frontend principles doc for CD (check both names)
+mkdir -p "$BUILD_DIR/payload/tmp/cdsync-cd-handoff"
+for f in FRONTEND_PRINCIPLES.md CLAUDE.md; do
+    if [ -f "$REPO_DIR/docs/$f" ]; then
+        cp "$REPO_DIR/docs/$f" "$BUILD_DIR/payload/tmp/cdsync-cd-handoff/"
+    fi
+done
 chmod +x "$BUILD_DIR/payload/tmp/cdsync-tools/cd-sync.js" \
          "$BUILD_DIR/payload/tmp/cdsync-tools/cd-pull.js" \
          "$BUILD_DIR/payload/tmp/cdsync-tools/cd-push.js"
@@ -78,6 +86,15 @@ if [ -d "$REPO_DIR" ] && [ -d "$STAGING" ]; then
     cp -f "$STAGING"/* "$TOOLS_DST/"
     chmod +x "$TOOLS_DST/cd-sync.js" "$TOOLS_DST/cd-pull.js" "$TOOLS_DST/cd-push.js" 2>/dev/null || true
 fi
+
+# --- Copy frontend principles doc to cd-handoff (for CD to read) ---
+HANDOFF_STAGING="/tmp/cdsync-cd-handoff"
+HANDOFF_DST="$REPO_DIR/docs/cd-handoff"
+if [ -d "$HANDOFF_STAGING" ] && [ -d "$REPO_DIR" ]; then
+    mkdir -p "$HANDOFF_DST"
+    cp -f "$HANDOFF_STAGING"/* "$HANDOFF_DST/" 2>/dev/null || true
+fi
+rm -rf "$HANDOFF_STAGING"
 
 # Clean up staging
 rm -rf "$STAGING"
