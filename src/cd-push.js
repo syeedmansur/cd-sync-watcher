@@ -372,7 +372,7 @@ function generateCDIndexHtml(map) {
   <div id="root"></div>
 
   <!-- Google Maps -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX8u0ShRh4l90JyTMLxxvYbehK1ae_xOA&libraries=places,geometry,drawing"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_KEY || ''}&libraries=places,geometry,drawing"></script>
 
 ${scriptTags}
 
