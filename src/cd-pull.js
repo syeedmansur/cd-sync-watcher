@@ -95,6 +95,201 @@ function buildExportLookup(map) {
 }
 
 /**
+ * Parse the trailing `Object.assign(window, { a, b, c })` block in a CD file
+ * and return the list of exported identifier names. Returns null if no such
+ * block is found. This is the source-of-truth for what a CD file exports;
+ * cd-pull uses it instead of relying on a possibly stale component-map.
+ */
+function extractObjectAssignExports(code) {
+  const match = code.match(/Object\.assign\s*\(\s*window\s*,\s*\{([\s\S]*?)\}\s*\)\s*;?/);
+  if (!match) return null;
+  const inside = match[1]
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const names = inside
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(s => {
+      const colonIdx = s.indexOf(":");
+      return colonIdx === -1 ? s : s.slice(0, colonIdx).trim();
+    })
+    .filter(n => /^[A-Za-z_$][\w$]*$/.test(n));
+  return names.length > 0 ? names : null;
+}
+
+/**
+ * Strip JS strings, template literals, and comments from code so identifier
+ * scanning doesn't get false positives from string contents.
+ */
+function stripStringsAndComments(code) {
+  let out = "";
+  let i = 0;
+  const n = code.length;
+  while (i < n) {
+    const c = code[i];
+    const nxt = code[i + 1];
+    // line comment
+    if (c === "/" && nxt === "/") {
+      while (i < n && code[i] !== "\n") i++;
+      continue;
+    }
+    // block comment
+    if (c === "/" && nxt === "*") {
+      i += 2;
+      while (i < n && !(code[i] === "*" && code[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+    // string (single, double, template)
+    if (c === '"' || c === "'" || c === "`") {
+      const quote = c;
+      i++;
+      while (i < n) {
+        if (code[i] === "\\") { i += 2; continue; }
+        if (code[i] === quote) { i++; break; }
+        // template literal expression `${...}` — preserve as code so identifiers inside stay scannable
+        if (quote === "`" && code[i] === "$" && code[i + 1] === "{") {
+          out += "${";
+          i += 2;
+          let depth = 1;
+          while (i < n && depth > 0) {
+            if (code[i] === "{") depth++;
+            else if (code[i] === "}") depth--;
+            if (depth > 0) out += code[i];
+            i++;
+          }
+          out += "}";
+          continue;
+        }
+        i++;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+const JS_KEYWORDS = new Set([
+  "if","else","for","while","do","switch","case","break","continue","return",
+  "function","var","let","const","class","extends","new","delete","typeof",
+  "instanceof","in","of","this","super","void","null","undefined","true","false",
+  "try","catch","finally","throw","async","await","yield","import","from","export",
+  "default","static","get","set","Object","Array","String","Number","Boolean",
+  "Math","JSON","Date","RegExp","Error","Promise","Map","Set","WeakMap","WeakSet",
+  "console","window","document","globalThis","arguments","NaN","Infinity",
+]);
+
+/**
+ * Extract the set of identifier names *referenced* in code (used but possibly not defined).
+ * Excludes keywords, builtins, and identifiers that look like property accesses (foo.bar — bar is excluded).
+ */
+function extractReferencedIdentifiers(code) {
+  const cleaned = stripStringsAndComments(code);
+  const refs = new Set();
+  // Match identifiers NOT preceded by a dot (so we skip foo.bar's "bar")
+  const re = /(^|[^.\w$])([A-Za-z_$][\w$]*)/g;
+  let m;
+  while ((m = re.exec(cleaned)) !== null) {
+    const name = m[2];
+    if (JS_KEYWORDS.has(name)) continue;
+    if (/^[0-9]/.test(name)) continue;
+    refs.add(name);
+  }
+  return refs;
+}
+
+/**
+ * Extract the set of identifiers *defined* locally in the file:
+ * function declarations, const/let/var bindings, parameter names, destructured names.
+ */
+function extractLocalDefinitions(code) {
+  const cleaned = stripStringsAndComments(code);
+  const defs = new Set();
+  // function name() { ... }
+  for (const m of cleaned.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)/g)) defs.add(m[1]);
+  for (const m of cleaned.matchAll(/\basync\s+function\s+([A-Za-z_$][\w$]*)/g)) defs.add(m[1]);
+  // const/let/var name = ...
+  for (const m of cleaned.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) defs.add(m[1]);
+  // const { a, b: x } = ... — destructured names
+  for (const m of cleaned.matchAll(/\b(?:const|let|var)\s*\{([^}]+)\}\s*=/g)) {
+    for (const part of m[1].split(",")) {
+      const name = part.split(":").pop().split("=")[0].trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(name)) defs.add(name);
+    }
+  }
+  // class Name { ... }
+  for (const m of cleaned.matchAll(/\bclass\s+([A-Za-z_$][\w$]*)/g)) defs.add(m[1]);
+  // Common function parameters — best-effort: scan `function foo(a, b, { c }) {` and arrow `(a, b) =>`
+  for (const m of cleaned.matchAll(/\bfunction[^(]*\(([^)]*)\)/g)) {
+    addParamsToSet(m[1], defs);
+  }
+  for (const m of cleaned.matchAll(/\(([^)]*)\)\s*=>/g)) {
+    addParamsToSet(m[1], defs);
+  }
+  return defs;
+}
+
+function addParamsToSet(params, set) {
+  const cleaned = params.replace(/\{[^}]*\}/g, p => p); // keep destructured names visible
+  for (const part of cleaned.split(",")) {
+    const inner = part.replace(/[{}]/g, " ");
+    for (const sub of inner.split(/[,\s:]/)) {
+      const name = sub.split("=")[0].trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(name)) set.add(name);
+    }
+  }
+}
+
+/**
+ * Heuristic to pick a repoPath for a new file: look at existing map entries and
+ * find the one whose filename shares the longest prefix; use that entry's directory.
+ * Falls back to `frontend/src/auto-imported/`.
+ */
+function inferRepoPath(fileName, map) {
+  let best = null;
+  let bestLen = 0;
+  for (const [, entry] of Object.entries(map)) {
+    const otherName = path.basename(entry.repoPath);
+    let prefix = 0;
+    while (
+      prefix < fileName.length &&
+      prefix < otherName.length &&
+      fileName[prefix] === otherName[prefix]
+    ) prefix++;
+    if (prefix > bestLen && prefix >= 3) {
+      bestLen = prefix;
+      best = entry;
+    }
+  }
+  if (best) {
+    return path.join(path.dirname(best.repoPath), fileName);
+  }
+  return path.join("frontend/src/auto-imported", fileName);
+}
+
+/**
+ * Write the component-map back to disk preserving custom fields.
+ * Only `cdPath`, `repoPath`, `exports`, `dependsOn` may be overwritten by cd-pull;
+ * everything else (protected, protectedReason, notes, etc.) is preserved.
+ */
+function saveMap(map) {
+  const SYSTEM_FIELDS = new Set(["cdPath", "repoPath", "exports", "dependsOn"]);
+  const raw = JSON.parse(fs.readFileSync(MAP_PATH, "utf8"));
+  for (const [key, entry] of Object.entries(map)) {
+    const existing = raw[key] || {};
+    const merged = { ...existing };
+    for (const [k, v] of Object.entries(entry)) {
+      if (SYSTEM_FIELDS.has(k) || !(k in existing)) merged[k] = v;
+    }
+    raw[key] = merged;
+  }
+  fs.writeFileSync(MAP_PATH, JSON.stringify(raw, null, 2) + "\n");
+}
+
+/**
  * Compute relative import path from one repo file to another.
  */
 function relPath(fromRepoPath, toRepoPath) {
@@ -107,6 +302,14 @@ function relPath(fromRepoPath, toRepoPath) {
 
 /**
  * Convert a CD window-global file to ES module format.
+ *
+ * Strategy (hardened, v2):
+ *   - Auto-detect exports from the trailing `Object.assign(window, {...})` block.
+ *     This is the source-of-truth; the component-map's `exports` field is used
+ *     only as a fallback when the block is missing.
+ *   - Auto-reconcile imports: after the export pass, find all identifiers used
+ *     but not defined or imported, look them up in the global export catalog,
+ *     and auto-add imports. This makes stale `dependsOn` self-correcting.
  */
 function windowGlobalsToEsm(code, entry, map, exportLookup) {
   const lines = code.split("\n");
@@ -114,7 +317,10 @@ function windowGlobalsToEsm(code, entry, map, exportLookup) {
   const reactHooks = [];
   let usesReactDefault = false;
 
-  // Parse the code to extract React hooks and strip CD-specific patterns
+  // Parse the code to extract React hooks and strip CD-specific patterns.
+  // The Object.assign block can span multiple lines; we strip the entire block.
+  let inObjectAssign = false;
+  let objAssignDepth = 0;
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -125,8 +331,18 @@ function windowGlobalsToEsm(code, entry, map, exportLookup) {
       continue;
     }
 
-    // Strip `Object.assign(window, { ... });`
-    if (/^Object\.assign\s*\(\s*window\s*,/.test(trimmed)) continue;
+    // Strip multi-line `Object.assign(window, { ... });`
+    if (!inObjectAssign && /^Object\.assign\s*\(\s*window\s*,/.test(trimmed)) {
+      inObjectAssign = true;
+      objAssignDepth = (line.match(/[{(]/g) || []).length - (line.match(/[})]/g) || []).length;
+      if (objAssignDepth <= 0) inObjectAssign = false;
+      continue;
+    }
+    if (inObjectAssign) {
+      objAssignDepth += (line.match(/[{(]/g) || []).length - (line.match(/[})]/g) || []).length;
+      if (objAssignDepth <= 0) inObjectAssign = false;
+      continue;
+    }
 
     output.push(line);
   }
@@ -140,8 +356,13 @@ function windowGlobalsToEsm(code, entry, map, exportLookup) {
     usesReactDefault = true;
   }
 
-  // Build import statements
+  // ─── Determine export list (auto-detect from Object.assign, fallback to map) ───
+  const autoExports = extractObjectAssignExports(code);
+  const exportNames = new Set(autoExports || entry.exports || []);
+
+  // ─── Build initial imports ───
   const imports = [];
+  const alreadyImported = new Set();
 
   // React imports
   if (usesReactDefault && reactHooks.length > 0) {
@@ -151,19 +372,32 @@ function windowGlobalsToEsm(code, entry, map, exportLookup) {
   } else if (reactHooks.length > 0) {
     imports.push(`import { ${reactHooks.join(", ")} } from "react";`);
   }
+  if (usesReactDefault) alreadyImported.add("React");
+  for (const h of reactHooks) alreadyImported.add(h);
 
-  // Component dependency imports (from dependsOn in map)
-  if (entry.dependsOn) {
-    for (const [depFile, depNames] of Object.entries(entry.dependsOn)) {
-      const depEntry = map[depFile];
-      if (!depEntry) continue;
-      const rel = relPath(entry.repoPath, depEntry.repoPath);
-      imports.push(`import { ${depNames.join(", ")} } from "${rel}";`);
-    }
+  // ─── Auto-reconcile component imports via identifier scanning ───
+  // (This replaces the brittle "trust dependsOn blindly" approach.)
+  const refs = extractReferencedIdentifiers(codeStr);
+  const localDefs = extractLocalDefinitions(codeStr);
+
+  // Group needed imports by source file
+  const importsBySource = new Map(); // repoPath -> Set<name>
+  for (const ref of refs) {
+    if (alreadyImported.has(ref)) continue;
+    if (localDefs.has(ref)) continue;
+    if (exportNames.has(ref)) continue; // own export
+    const sourcePath = exportLookup[ref];
+    if (!sourcePath || sourcePath === entry.repoPath) continue;
+    if (!importsBySource.has(sourcePath)) importsBySource.set(sourcePath, new Set());
+    importsBySource.get(sourcePath).add(ref);
+  }
+  for (const [sourcePath, names] of importsBySource) {
+    const rel = relPath(entry.repoPath, sourcePath);
+    imports.push(`import { ${[...names].sort().join(", ")} } from "${rel}";`);
+    for (const n of names) alreadyImported.add(n);
   }
 
   // Add `export` before exported declarations
-  const exportNames = new Set(entry.exports || []);
   const transformed = [];
   for (const line of output) {
     let l = line;
@@ -176,6 +410,20 @@ function windowGlobalsToEsm(code, entry, map, exportLookup) {
       l = l.replace(new RegExp(`^(let\\s+${expName}\\s*=)`), `export $1`);
     }
     transformed.push(l);
+  }
+
+  // If any export wasn't matched by the declaration regexes above (e.g., destructured
+  // function calls or values defined elsewhere), emit a trailing `export { ... }`
+  // block so the build doesn't break.
+  const declaredExportNames = new Set();
+  for (const line of transformed) {
+    const m = line.match(/^export\s+(?:async\s+)?(?:function|const|let|class)\s+([A-Za-z_$][\w$]*)/);
+    if (m) declaredExportNames.add(m[1]);
+  }
+  const trailingExports = [...exportNames].filter(n => !declaredExportNames.has(n) && localDefs.has(n));
+  if (trailingExports.length > 0) {
+    transformed.push("");
+    transformed.push(`export { ${trailingExports.join(", ")} };`);
   }
 
   // Find insert point (after first leading comment block only)
@@ -391,15 +639,75 @@ function main() {
   const map = loadMap();
   const cdDir = resolveInput(input);
   const cdFiles = findCDFiles(cdDir);
-  const exportLookup = buildExportLookup(map);
 
   console.log(`\ncd-pull: importing from ${cdDir}`);
   console.log(`Found ${Object.keys(cdFiles).length} files in CD export\n`);
+
+  // ── Auto-map: discover unmapped .jsx/.js files and create entries ──
+  const mappedCDNames = new Set(Object.values(map).map(e => path.basename(e.cdPath)));
+  const autoMapped = [];
+  const knownNonComponent = new Set(["colors_and_type.css"]);
+  for (const [fileName, filePath] of Object.entries(cdFiles)) {
+    if (!fileName.endsWith(".jsx") && !fileName.endsWith(".js")) continue;
+    if (mappedCDNames.has(fileName)) continue;
+    if (knownNonComponent.has(fileName)) continue;
+    if (fileName.startsWith("Mission Control") || fileName === "index.html") continue;
+    const code = fs.readFileSync(filePath, "utf8");
+    const exports = extractObjectAssignExports(code);
+    if (!exports || exports.length === 0) continue; // not a component file
+    const repoPath = inferRepoPath(fileName, map);
+    const cdPath = path.relative(cdDir, filePath);
+    const mapKey = fileName;
+    map[mapKey] = {
+      cdPath,
+      repoPath,
+      exports,
+      dependsOn: {}, // imports will be auto-resolved via identifier scanning
+    };
+    autoMapped.push({ mapKey, repoPath, exports });
+  }
+
+  // Refresh exports list for already-mapped files (auto-detect from Object.assign).
+  // Preserves all custom fields including `protected` per saveMap()'s logic.
+  for (const [mapKey, entry] of Object.entries(map)) {
+    const cdFileName = path.basename(entry.cdPath);
+    const cdFile = cdFiles[cdFileName];
+    if (!cdFile) continue;
+    const code = fs.readFileSync(cdFile, "utf8");
+    const detected = extractObjectAssignExports(code);
+    if (detected && detected.length > 0) {
+      const before = JSON.stringify(entry.exports || []);
+      const after = JSON.stringify(detected);
+      if (before !== after) entry.exports = detected;
+    }
+  }
+
+  // Build the export lookup AFTER auto-mapping so new files contribute their exports.
+  const exportLookup = buildExportLookup(map);
 
   const changes = [];
   const skipped = [];
   const unmapped = [];
   const protected_ = [];
+
+  // ── Snapshot machinery for build-verify rollback ──
+  const writeSnapshot = new Map(); // absPath -> originalContent (null if didn't exist)
+  function writeFileSnapshotted(absPath, content) {
+    if (!writeSnapshot.has(absPath)) {
+      writeSnapshot.set(absPath, fs.existsSync(absPath) ? fs.readFileSync(absPath, "utf8") : null);
+    }
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, content);
+  }
+  function restoreAllSnapshotted() {
+    for (const [absPath, original] of writeSnapshot.entries()) {
+      if (original === null) {
+        if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+      } else {
+        fs.writeFileSync(absPath, original);
+      }
+    }
+  }
 
   // Process mapped component files
   for (const [mapKey, entry] of Object.entries(map)) {
@@ -426,14 +734,12 @@ function main() {
     // Save CD's version as .cd-incoming for manual merge instead of overwriting.
     if (entry.protected) {
       const incomingPath = repoFile + ".cd-incoming";
-      fs.mkdirSync(repoDir, { recursive: true });
-      fs.writeFileSync(incomingPath, esmCode);
+      writeFileSnapshotted(incomingPath, esmCode);
       protected_.push({ file: entry.repoPath, incoming: incomingPath, reason: entry.protectedReason || "has backend wiring" });
       continue;
     }
 
-    fs.mkdirSync(repoDir, { recursive: true });
-    fs.writeFileSync(repoFile, esmCode);
+    writeFileSnapshotted(repoFile, esmCode);
     changes.push(`${existed ? "Updated" : "Added"}: ${entry.repoPath}  (from ${entry.cdPath})`);
   }
 
@@ -442,7 +748,7 @@ function main() {
   if (cssFile) {
     const dest = path.join(REPO_ROOT, "frontend/src/design-system/tokens.css");
     if (!filesEqual(cssFile, dest)) {
-      fs.copyFileSync(cssFile, dest);
+      writeFileSnapshotted(dest, fs.readFileSync(cssFile, "utf8"));
       changes.push("Updated: frontend/src/design-system/tokens.css");
     }
   }
@@ -491,6 +797,11 @@ function main() {
     // CSS auto-merge: extract CD's <style> rules and merge into tokens.css
     const styleMatch = cdHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
     if (styleMatch) {
+      // Snapshot tokens.css before mergeCSS rewrites it, so rollback works.
+      const tokensPathAbs = path.join(REPO_ROOT, "frontend/src/design-system/tokens.css");
+      if (!writeSnapshot.has(tokensPathAbs)) {
+        writeSnapshot.set(tokensPathAbs, fs.existsSync(tokensPathAbs) ? fs.readFileSync(tokensPathAbs, "utf8") : null);
+      }
       const merged = mergeCSS(styleMatch[1]);
       if (merged.added.length > 0 || merged.updated.length > 0) {
         console.log("========================================");
@@ -524,11 +835,11 @@ function main() {
     }
   }
 
-  // Find unmapped component files
-  const mappedCDNames = new Set(Object.values(map).map(e => path.basename(e.cdPath)));
+  // Find truly unmapped component files (files we couldn't auto-map either)
+  const mappedCDNamesNow = new Set(Object.values(map).map(e => path.basename(e.cdPath)));
   const knownSpecial = new Set(["colors_and_type.css", ...htmlVersions]);
   for (const f of Object.keys(cdFiles)) {
-    if (!mappedCDNames.has(f) && !knownSpecial.has(f) && (f.endsWith(".jsx") || f.endsWith(".js"))) {
+    if (!mappedCDNamesNow.has(f) && !knownSpecial.has(f) && (f.endsWith(".jsx") || f.endsWith(".js"))) {
       unmapped.push(f);
     }
   }
@@ -582,8 +893,19 @@ function main() {
     }
   }
 
+  if (autoMapped.length > 0) {
+    console.log("========================================");
+    console.log("  AUTO-MAPPED NEW FILES");
+    console.log("========================================\n");
+    console.log("These files were not in component-map.json — cd-pull added them automatically:\n");
+    for (const a of autoMapped) {
+      console.log(`  ${a.mapKey}  →  ${a.repoPath}  (exports: ${a.exports.slice(0, 4).join(", ")}${a.exports.length > 4 ? ", …" : ""})`);
+    }
+    console.log("");
+  }
+
   if (unmapped.length > 0) {
-    console.log(`${unmapped.length} unmapped file(s) — add to component-map.json:\n`);
+    console.log(`${unmapped.length} unmapped file(s) — no Object.assign(window,...) block found, manual mapping needed:\n`);
     unmapped.forEach(f => console.log(`  ${f}`));
     console.log("");
   }
@@ -605,6 +927,33 @@ function main() {
     }
     console.log("\n  These are guidance — review them in context of the existing");
     console.log("  architecture and design patterns before implementing.\n");
+  }
+
+  // Persist component-map (preserves protected/custom fields per saveMap()'s allow-list).
+  // Snapshot the map file first so it also rolls back on build failure.
+  if (!writeSnapshot.has(MAP_PATH)) {
+    writeSnapshot.set(MAP_PATH, fs.existsSync(MAP_PATH) ? fs.readFileSync(MAP_PATH, "utf8") : null);
+  }
+  saveMap(map);
+
+  // ── Build-verify with rollback ──
+  const skipBuildVerify = process.argv.includes("--no-build-verify");
+  if (!skipBuildVerify && writeSnapshot.size > 0) {
+    console.log("Verifying Vite build...");
+    try {
+      execSync("npx vite build", { cwd: REPO_ROOT, stdio: "pipe", encoding: "utf8" });
+      console.log("Build verified ✓\n");
+    } catch (err) {
+      const stderr = (err.stdout || "") + "\n" + (err.stderr || "");
+      console.error("\n========================================");
+      console.error("  BUILD FAILED — rolling back cd-pull writes");
+      console.error("========================================\n");
+      console.error(stderr.split("\n").slice(-30).join("\n"));
+      restoreAllSnapshotted();
+      console.error("\nRepo restored to pre-pull state. The CD export is preserved in .cd-import-tmp/");
+      console.error("for inspection. Re-run with --no-build-verify to skip rollback.\n");
+      process.exit(1);
+    }
   }
 
   // Cleanup temp dir
