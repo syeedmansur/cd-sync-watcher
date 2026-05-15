@@ -235,7 +235,7 @@ function main() {
   let changeset = `# CD Changeset — ${timestamp}\n\n`;
   changeset += `${exported.length} file(s) to import into Claude Design.\n\n`;
   changeset += `## How to import\n\n`;
-  changeset += `Use the **paperclip button** in CD to attach each file listed below.\n`;
+  changeset += `Use **"Link code folder"** in CD and point it at this \`cd-changeset/\` directory.\n`;
   changeset += `Tell CD: "I'm updating these files from the repo. Replace the existing versions."\n\n`;
 
   if (rootFiles.length > 0) {
@@ -259,12 +259,12 @@ function main() {
 
   fs.writeFileSync(path.join(OUTPUT_DIR, "CHANGESET.md"), changeset);
 
-  // Always include principles docs for CD to read
-  const principlesNames = ["FRONTEND_PRINCIPLES.md", "DEV_PRINCIPLES.md"];
+  // Always include every .md file in docs/cd-handoff/ for CD to read
   const docsDir = path.join(REPO_ROOT, "docs", "cd-handoff");
-  for (const name of principlesNames) {
-    const src = path.join(docsDir, name);
-    if (fs.existsSync(src)) {
+  if (fs.existsSync(docsDir)) {
+    for (const name of fs.readdirSync(docsDir)) {
+      if (!name.endsWith(".md")) continue;
+      const src = path.join(docsDir, name);
       fs.copyFileSync(src, path.join(OUTPUT_DIR, name));
       console.log(`  Included ${name} for CD`);
     }
@@ -273,7 +273,7 @@ function main() {
   console.log(`\ncd-push: exported ${exported.length} file(s) to cd-changeset/\n`);
   exported.forEach(e => console.log(`  ${e.cdPath}  ←  ${e.repoPath}`));
   console.log(`\nRead cd-changeset/CHANGESET.md for import instructions.`);
-  console.log(`Files are in cd-changeset/ ready to paperclip-attach into CD.\n`);
+  console.log(`Files are in cd-changeset/ — link this folder in CD via "Link code folder".\n`);
 
   // Tag sync point
   try {

@@ -452,6 +452,16 @@ function watch() {
     }); } catch { /* non-fatal */ }
   }
 
+  // Watch docs/cd-handoff/ so new/updated spec .md files auto-push to CD
+  const handoffDir = path.join(REPO_ROOT, "docs", "cd-handoff");
+  if (fs.existsSync(handoffDir)) {
+    try { fs.watch(handoffDir, (event, filename) => {
+      if (!filename || !filename.endsWith(".md")) return;
+      if (pushTimer) clearTimeout(pushTimer);
+      pushTimer = setTimeout(autoPush, PUSH_DEBOUNCE_MS);
+    }); } catch { /* non-fatal */ }
+  }
+
   // Do an initial push so cd-changeset/ is current
   autoPush();
 
